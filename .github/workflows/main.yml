@@ -1,60 +1,34 @@
-name: Build crDroid PermissionController APEX
-on:
-  workflow_dispatch:
-  push:
-    branches: [ 14.0, 13.0, main ]
+  - name: Build single APEX module
+    shell: bash                       # без флага -e
+    run: |
+      # 1. добавляем в PATH готовые бинарники
+      export PATH="$HOME/prebuilts/build-tools/linux-x86/bin:$PATH"
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      # 2. проверяем, что soong_ui есть
+      if ! command -v soong_ui >/dev/null 2>&1 ; then
+          echo "soong_ui not found in PATH"
+          exit 1
+      fi
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
+      export TOP=$GITHUB_WORKSPACE
+      export OUT=$TOP/out
 
-      - name: Cache prebuilts
-        id: prebuilts
-        uses: actions/cache@v4
-        with:
-          path: ~/prebuilts
-          key: prebuilts-${{ runner.os }}-v2
+      # 3. отключаем авто-выход, чтобы внутренние «exit 1» не останавливали job
+      set +e
+      set -o pipefail
 
-      - name: Install minimal AOSP deps
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y git-core zip curl unzip
+      # 4. собираем только наш APEX
+      echo "=====  soong_ui start  ====="
+      soong_ui --make-mode com.android.permissioncontroller.apex -j$(nproc)
+      build_result=$?
+      echo "=====  soong_ui finished with code $build_result  ====="
 
-      - name: Clone Android build-tools (soong + prebuilts)
-        if: steps.prebuilts.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ~/prebuilts
-          cd ~/prebuilts
-          git clone --depth 1 https://android.googlesource.com/platform/prebuilts/build-tools build-tools
-          git clone --depth 1 https://android.googlesource.com/platform/build/soong           soong
-
-      - name: Build single APEX module
-        run: |
-          # 1. добавляем в PATH готовые бинарники
-          export PATH="$HOME/prebuilts/build-tools/linux-x86/bin:$PATH"
-
-          # 2. проверяем, что soong_ui есть
-          command -v soong_ui
-
-          export TOP=$GITHUB_WORKSPACE
-          export OUT=$TOP/out
-
-          # 3. собираем только наш APEX
-          soong_ui --make-mode com.android.permissioncontroller.apex -j$(nproc)
-
-          # 4. показываем результат
-          ls -lh $OUT/soong/apex/*.apex
-
-      - name: Upload artefact
-        uses: actions/upload-artifact@v4
-        with:
-          name: PermissionController-crDroid
-          path: out/soong/apex/com.android.permissioncontroller.apex
+      # 5. проверяем, что артефакт действительно появился
+      apex_file="$OUT/soong/apex/com.android.permissioncontroller.apex"
+      if [ -f "$apex_file" ]; then
+          echo "Success: $apex_file"
+          ls -lh "$apex_file"
+      else
+          echo "ERROR: $apex_file not found (build returned $build_result)"
+          exit $build_result
+      fi
