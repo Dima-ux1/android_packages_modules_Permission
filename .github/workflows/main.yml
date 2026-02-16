@@ -1,6 +1,6 @@
 name: Build crDroid PermissionController APEX
 on:
-  workflow_dispatch:          # ручная кнопка «Run workflow»
+  workflow_dispatch:
   push:
     branches: [ 14.0, 13.0, main ]
 
@@ -16,31 +16,41 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Cache prebuilts
+        id: prebuilts
+        uses: actions/cache@v4
+        with:
+          path: ~/prebuilts
+          key: prebuilts-${{ runner.os }}-v2
+
       - name: Install minimal AOSP deps
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y git-core zip curl unzip
 
       - name: Clone Android build-tools (soong + prebuilts)
+        if: steps.prebuilts.outputs.cache-hit != 'true'
         run: |
           mkdir -p ~/prebuilts
           cd ~/prebuilts
           git clone --depth 1 https://android.googlesource.com/platform/prebuilts/build-tools build-tools
-          git clone --depth 1 https://android.googlesource.com/platform/prebuilts/sdk        sdk
           git clone --depth 1 https://android.googlesource.com/platform/build/soong           soong
 
       - name: Build single APEX module
         run: |
-          # кладём всё в одну папку, чтобы soong нашёлся
-          ln -s ~/prebuilts/build-tools/linux-x86/bin/* ~/prebuilts/sdk/linux-x86/bin/* ~/prebuilts/soong/ ./ 2>/dev/null || true
-          export PATH="$PWD:$PATH"
+          # 1. добавляем в PATH готовые бинарники
+          export PATH="$HOME/prebuilts/build-tools/linux-x86/bin:$PATH"
+
+          # 2. проверяем, что soong_ui есть
+          command -v soong_ui
 
           export TOP=$GITHUB_WORKSPACE
           export OUT=$TOP/out
 
-          # собираем ТОЛЬКО наш модуль
+          # 3. собираем только наш APEX
           soong_ui --make-mode com.android.permissioncontroller.apex -j$(nproc)
 
+          # 4. показываем результат
           ls -lh $OUT/soong/apex/*.apex
 
       - name: Upload artefact
