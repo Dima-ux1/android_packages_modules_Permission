@@ -23,16 +23,25 @@ jobs:
       - name: System deps
         run: sudo apt-get update -qq && sudo apt-get install -y git zip unzip curl
 
-      - name: Download official soong_ui
+      - name: Clone build/soong
         run: |
-          # качаем пред-собранный soong_ui из AOSP-контейнера
-          curl -L -o /tmp/soong_ui \
-            https://storage.googleapis.com/android-build/misc/soong_ui
+          git clone --depth 1 https://android.googlesource.com/platform/build build
+          git clone --depth 1 https://android.googlesource.com/platform/build/soong soong
+
+      - name: Fetch missing go modules
+        run: |
+          go mod download \
+            github.com/google/blueprint \
+            github.com/golang/protobuf \
+            github.com/google/go-cmp \
+            go.starlark.net
+
+      - name: Build soong_ui
+        run: |
+          cd soong/cmd/soong_ui
+          go build -o /tmp/soong_ui .
           chmod +x /tmp/soong_ui
           echo "SOONG_UI=/tmp/soong_ui" >> $GITHUB_ENV
-
-      - name: Clone minimal build/
-        run: git clone --depth 1 https://android.googlesource.com/platform/build build
 
       - name: Build APEX
         run: |
