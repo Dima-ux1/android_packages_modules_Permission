@@ -28,14 +28,6 @@ jobs:
           git clone --depth 1 https://android.googlesource.com/platform/build build
           git clone --depth 1 https://android.googlesource.com/platform/build/soong soong
 
-      - name: Fetch missing go modules
-        run: |
-          go mod download \
-            github.com/google/blueprint \
-            github.com/golang/protobuf \
-            github.com/google/go-cmp \
-            go.starlark.net
-
       - name: Build soong_ui
         run: |
           cd soong/cmd/soong_ui
