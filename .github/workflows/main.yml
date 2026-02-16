@@ -23,22 +23,23 @@ jobs:
       - name: System deps
         run: sudo apt-get update -qq && sudo apt-get install -y git zip unzip curl
 
-      - name: Clone build/soong + sub-modules
+      - name: Clone build/soong + blueprint
         run: |
           git clone --depth 1 https://android.googlesource.com/platform/build          build
           git clone --depth 1 https://android.googlesource.com/platform/build/soong      soong
-          git clone --depth 1 https://android.googlesource.com/platform/build/blueprint  blueprint
-          git clone --depth 1 https://android.googlesource.com/platform/external/go-cmp        external/go-cmp
-          git clone --depth 1 https://android.googlesource.com/platform/external/golang-protobuf external/golang-protobuf
-          git clone --depth 1 https://android.googlesource.com/platform/external/starlark-go     external/starlark-go
+          git clone --depth 1 https://android.googlesource.com/platform/build/blueprint   blueprint
 
-      - name: Build soong_ui
+      - name: Build soong_ui via bootstrap
         run: |
-          cd soong/cmd/soong_ui
-          export GOWORK=off
-          go build -o /tmp/soong_ui .
-          chmod +x /tmp/soong_ui
-          echo "SOONG_UI=/tmp/soong_ui" >> $GITHUB_ENV
+          cd soong
+          go mod download
+          BLUEPRINTDIR=$PWD/../blueprint \
+          BOOTSTRAP=$PWD/../blueprint/bootstrap.bash \
+          ./bootstrap.bash
+          mkdir -p out/host/linux-x86/bin
+          cp out/soong_ui out/host/linux-x86/bin/soong_ui
+          chmod +x out/host/linux-x86/bin/soong_ui
+          echo "SOONG_UI=$PWD/out/soong_ui" >> $GITHUB_ENV
 
       - name: Build APEX
         run: |
