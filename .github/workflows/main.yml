@@ -1,4 +1,5 @@
-name: Build crDroid PermissionController APEX
+name: Build PermissionController APEX (A16)
+
 on:
   workflow_dispatch:
   push:
@@ -7,61 +8,56 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      # 1. исходники модуля
+      - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      # 2. JDK 17
+      - uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          distribution: temurin
+          java-version: 17
 
-      - name: Cache prebuilts
-        id: prebuilts
-        uses: actions/cache@v4
+      # 3. кэш prebuilts (чтобы не тянуть каждый раз)
+      - uses: actions/cache@v4
+        id: prebuilts-cache
         with:
           path: ~/prebuilts
-          key: prebuilts-${{ runner.os }}-v2
+          key: prebuilts-ubuntu-latest-v1
 
-      - name: Install minimal AOSP deps
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y git-core zip curl unzip
+      # 4. минимальные зависимости
+      - run: sudo apt-get update -qq && sudo apt-get install -y git zip unzip
 
-      - name: Clone Android build-tools (soong + prebuilts)
-        if: steps.prebuilts.outputs.cache-hit != 'true'
+      # 5. качаем build-tools и build (только первый раз)
+      - name: Fetch build essentials
+        if: steps.prebuilts-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ~/prebuilts
           cd ~/prebuilts
           git clone --depth 1 https://android.googlesource.com/platform/prebuilts/build-tools build-tools
-          git clone --depth 1 https://android.googlesource.com/platform/build/soong           soong
+          git clone --depth 1 https://android.googlesource.com/platform/build              build
 
-      - name: Clone minimal build/ tree
-        run: |
-          # soong_ui требует Android.bp/Android.mk в корне
-          if [[ ! -d $GITHUB_WORKSPACE/build ]]; then
-            git clone --depth 1 https://android.googlesource.com/platform/build $GITHUB_WORKSPACE/build
-          fi
-
-      - name: Build single APEX module
-        shell: bash
+      # 6. собираем
+      - name: Build com.android.permissioncontroller.apex
         run: |
           set -euo pipefail
-          cd $GITHUB_WORKSPACE
           export TOP=$GITHUB_WORKSPACE
           export OUT=$TOP/out
-          BUILDTOOLS="$HOME/prebuilts/build-tools"
+          BUILDTOOLS=~/prebuilts/build-tools
 
-          [[ -f $BUILDTOOLS/linux-x86/soong_ui ]] \
-            || { echo "❌  soong_ui not found"; exit 1; }
-
+          # кладём soong_ui в PATH
           export PATH="$BUILDTOOLS/linux-x86:$PATH"
+
+          # копируем нужный минимальный build/ в корень
+          [[ -d build ]] || cp -r ~/prebuilts/build build
+
+          # собираем
+          cd $TOP
           soong_ui --make-mode com.android.permissioncontroller.apex -j$(nproc)
 
-      - name: Upload artefact
-        uses: actions/upload-artifact@v4
+      # 7. выкладываем
+      - uses: actions/upload-artifact@v4
         with:
-          name: PermissionController-crDroid
+          name: PermissionController-A16-apex
           path: out/soong/apex/com.android.permissioncontroller.apex
