@@ -1,5 +1,23 @@
-      - name: Install deps
-        run: sudo apt-get update -qq && sudo apt-get install -y git zip unzip
+name: Build PermissionController APEX (A16)
+on:
+  workflow_dispatch:
+  push:
+    branches: [ 16.0 ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install system deps
+        run: sudo apt-get update -qq && sudo apt-get install -y git zip unzip curl
 
       - name: Install Go 1.23
         run: |
@@ -18,13 +36,17 @@
           echo "SOONG_UI=$PWD/soong_ui" >> $GITHUB_ENV
 
       - name: Clone minimal build/ into repo root
-        run: |
-          git clone --depth 1 https://android.googlesource.com/platform/build build
+        run: git clone --depth 1 https://android.googlesource.com/platform/build build
 
       - name: Build APEX
         run: |
           export TOP=$GITHUB_WORKSPACE
           export OUT=$TOP/out
           export PATH="$(dirname $SOONG_UI):$PATH"
-          cd $TOP
           $SOONG_UI --make-mode com.android.permissioncontroller.apex -j$(nproc)
+
+      - name: Upload APEX
+        uses: actions/upload-artifact@v4
+        with:
+          name: PermissionController-A16
+          path: out/soong/apex/com.android.permissioncontroller.apex
