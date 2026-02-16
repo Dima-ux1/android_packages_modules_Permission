@@ -17,35 +17,20 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Cache prebuilts
-        id: prebuilts-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/prebuilts
-          key: prebuilts-ubuntu-v2
-
       - name: Install deps
-        run: sudo apt-get update -qq && sudo apt-get install -y git zip unzip
+        run: sudo apt-get update -qq && sudo apt-get install -y git zip unzip golang-go
 
-      - name: Fetch build-tools + build (once)
-        if: steps.prebuilts-cache.outputs.cache-hit != 'true'
+      - name: Build soong_ui from source
         run: |
-          mkdir -p ~/prebuilts
-          cd ~/prebuilts
-          git clone --depth 1 https://android.googlesource.com/platform/prebuilts/build-tools build-tools
-          git clone --depth 1 https://android.googlesource.com/platform/build build
-
-      - name: Locate soong_ui and make it executable
-        run: |
-          find ~/prebuilts -name soong_ui -type f -exec chmod +x {} \;
-          SOONG_UI=$(find ~/prebuilts -name soong_ui -type f | head -n1)
-          [[ -n "$SOONG_UI" ]] || { echo "❌ soong_ui not found"; exit 1; }
-          echo "✅ Found: $SOONG_UI"
-          echo "SOONG_UI=$SOONG_UI" >> $GITHUB_ENV
+          git clone --depth 1 https://android.googlesource.com/platform/build/soong ~/soong
+          cd ~/soong/cmd/soong_ui
+          go build -o soong_ui .
+          chmod +x soong_ui
+          echo "SOONG_UI=$PWD/soong_ui" >> $GITHUB_ENV
 
       - name: Clone minimal build/ into repo root
         run: |
-          [[ -d build ]] || cp -r ~/prebuilts/build build
+          git clone --depth 1 https://android.googlesource.com/platform/build build
 
       - name: Build APEX
         run: |
@@ -53,7 +38,7 @@ jobs:
           export OUT=$TOP/out
           export PATH="$(dirname $SOONG_UI):$PATH"
           cd $TOP
-          soong_ui --make-mode com.android.permissioncontroller.apex -j$(nproc)
+          $SOONG_UI --make-mode com.android.permissioncontroller.apex -j$(nproc)
 
       - name: Upload APEX
         uses: actions/upload-artifact@v4
