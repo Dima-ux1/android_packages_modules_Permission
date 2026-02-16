@@ -43,6 +43,7 @@ jobs:
           chmod +x /tmp/soong_ui
           echo "SOONG_UI=/tmp/soong_ui" >> $GITHUB_ENV
 
+
       - name: Build APEX
         run: |
           export TOP=$GITHUB_WORKSPACE
