@@ -23,10 +23,14 @@ jobs:
       - name: System deps
         run: sudo apt-get update -qq && sudo apt-get install -y git zip unzip curl
 
-      - name: Clone build/soong
+      - name: Clone build/soong + sub-modules
         run: |
-          git clone --depth 1 https://android.googlesource.com/platform/build build
-          git clone --depth 1 https://android.googlesource.com/platform/build/soong soong
+          git clone --depth 1 https://android.googlesource.com/platform/build          build
+          git clone --depth 1 https://android.googlesource.com/platform/build/soong      soong
+          git clone --depth 1 https://android.googlesource.com/platform/build/blueprint  blueprint
+          git clone --depth 1 https://android.googlesource.com/platform/external/go-cmp        external/go-cmp
+          git clone --depth 1 https://android.googlesource.com/platform/external/golang-protobuf external/golang-protobuf
+          git clone --depth 1 https://android.googlesource.com/platform/external/starlark-go     external/starlark-go
 
       - name: Build soong_ui
         run: |
@@ -34,7 +38,6 @@ jobs:
           go build -o /tmp/soong_ui .
           chmod +x /tmp/soong_ui
           echo "SOONG_UI=/tmp/soong_ui" >> $GITHUB_ENV
-
 
       - name: Build APEX
         run: |
