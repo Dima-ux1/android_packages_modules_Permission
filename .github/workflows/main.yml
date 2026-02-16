@@ -29,12 +29,16 @@ jobs:
           git clone --depth 1 https://android.googlesource.com/platform/build/soong      soong
           git clone --depth 1 https://android.googlesource.com/platform/build/blueprint   blueprint
 
+      - name: Patch go.mod (use local blueprint)
+        run: |
+          cd soong
+          rm -f go.work go.work.sum
+          go mod edit -replace github.com/google/blueprint=../blueprint
+          go mod tidy
+
       - name: Build soong_ui via bootstrap
         run: |
           cd soong
-          # удаляем go.work, чтобы go не искал external/*
-          rm -f go.work go.work.sum
-          # дальше штатный bootstrap
           go mod download
           BLUEPRINTDIR=$PWD/../blueprint \
           BOOTSTRAP=$PWD/../blueprint/bootstrap.bash \
