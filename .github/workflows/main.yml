@@ -23,20 +23,18 @@ jobs:
       - name: System deps
         run: sudo apt-get update -qq && sudo apt-get install -y git zip unzip curl
 
-      - name: Clone build stack + extra deps
+      - name: Clone build stack + starlark-go
         run: |
           git clone --depth 1 https://android.googlesource.com/platform/build          build
           git clone --depth 1 https://android.googlesource.com/platform/build/soong      soong
           git clone --depth 1 https://android.googlesource.com/platform/build/blueprint   blueprint
-          git clone --depth 1 https://android.googlesource.com/platform/external/protobuf   external/protobuf
           git clone --depth 1 https://android.googlesource.com/platform/external/starlark-go external/starlark-go
 
-      - name: Patch go.mod
+      - name: Patch go.mod (blueprint + starlark only)
         run: |
           cd soong
           rm -f go.work go.work.sum
           go mod edit -replace github.com/google/blueprint=../blueprint
-          go mod edit -replace google.golang.org/protobuf=../external/protobuf
           go mod edit -replace go.starlark.net=../external/starlark-go
           go mod tidy
           go mod download
@@ -58,7 +56,6 @@ jobs:
           export OUT=$TOP/out
           mkdir -p "$OUT"
           "$SOONG_UI" --make-mode com.android.permissioncontroller.apex -j$(nproc)
-
 
       - name: Upload APEX artifact
         uses: actions/upload-artifact@v4
