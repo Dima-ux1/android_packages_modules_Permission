@@ -10,54 +10,53 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      # 1. исходники модуля
       - uses: actions/checkout@v4
 
-      # 2. JDK 17
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      # 3. кэш prebuilts (чтобы не тянуть каждый раз)
-      - uses: actions/cache@v4
+      - name: Cache prebuilts
         id: prebuilts-cache
+        uses: actions/cache@v4
         with:
           path: ~/prebuilts
-          key: prebuilts-ubuntu-latest-v1
+          key: prebuilts-ubuntu-v2
 
-      # 4. минимальные зависимости
-      - run: sudo apt-get update -qq && sudo apt-get install -y git zip unzip
+      - name: Install deps
+        run: sudo apt-get update -qq && sudo apt-get install -y git zip unzip
 
-      # 5. качаем build-tools и build (только первый раз)
-      - name: Fetch build essentials
+      - name: Fetch build-tools + build (once)
         if: steps.prebuilts-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ~/prebuilts
           cd ~/prebuilts
           git clone --depth 1 https://android.googlesource.com/platform/prebuilts/build-tools build-tools
-          git clone --depth 1 https://android.googlesource.com/platform/build              build
+          git clone --depth 1 https://android.googlesource.com/platform/build build
 
-      # 6. собираем
-      - name: Build com.android.permissioncontroller.apex
+      - name: Locate soong_ui and make it executable
         run: |
-          set -euo pipefail
-          export TOP=$GITHUB_WORKSPACE
-          export OUT=$TOP/out
-          BUILDTOOLS=~/prebuilts/build-tools
+          find ~/prebuilts -name soong_ui -type f -exec chmod +x {} \;
+          SOONG_UI=$(find ~/prebuilts -name soong_ui -type f | head -n1)
+          [[ -n "$SOONG_UI" ]] || { echo "❌ soong_ui not found"; exit 1; }
+          echo "✅ Found: $SOONG_UI"
+          echo "SOONG_UI=$SOONG_UI" >> $GITHUB_ENV
 
-          # кладём soong_ui в PATH
-          export PATH="$BUILDTOOLS/linux-x86:$PATH"
-
-          # копируем нужный минимальный build/ в корень
+      - name: Clone minimal build/ into repo root
+        run: |
           [[ -d build ]] || cp -r ~/prebuilts/build build
 
-          # собираем
+      - name: Build APEX
+        run: |
+          export TOP=$GITHUB_WORKSPACE
+          export OUT=$TOP/out
+          export PATH="$(dirname $SOONG_UI):$PATH"
           cd $TOP
           soong_ui --make-mode com.android.permissioncontroller.apex -j$(nproc)
 
-      # 7. выкладываем
-      - uses: actions/upload-artifact@v4
+      - name: Upload APEX
+        uses: actions/upload-artifact@v4
         with:
-          name: PermissionController-A16-apex
+          name: PermissionController-A16
           path: out/soong/apex/com.android.permissioncontroller.apex
