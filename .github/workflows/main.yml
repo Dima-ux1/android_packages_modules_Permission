@@ -1,34 +1,28 @@
   - name: Build single APEX module
-    shell: bash                       # без флага -e
+    shell: bash          # GitHub перестаёт ставить -e
     run: |
-      # 1. добавляем в PATH готовые бинарники
+      # 1. кладём утилиты в PATH
       export PATH="$HOME/prebuilts/build-tools/linux-x86/bin:$PATH"
+      command -v soong_ui || { echo "soong_ui not found"; exit 1; }
 
-      # 2. проверяем, что soong_ui есть
-      if ! command -v soong_ui >/dev/null 2>&1 ; then
-          echo "soong_ui not found in PATH"
-          exit 1
-      fi
-
+      # 2. экспортируем переменные окружения AOSP
       export TOP=$GITHUB_WORKSPACE
       export OUT=$TOP/out
 
-      # 3. отключаем авто-выход, чтобы внутренние «exit 1» не останавливали job
+      # 3. отключаем авто-выход, чтобы внутренний «exit 1» не убивал job
       set +e
       set -o pipefail
 
-      # 4. собираем только наш APEX
-      echo "=====  soong_ui start  ====="
+      # 4. собираем
       soong_ui --make-mode com.android.permissioncontroller.apex -j$(nproc)
       build_result=$?
-      echo "=====  soong_ui finished with code $build_result  ====="
 
-      # 5. проверяем, что артефакт действительно появился
+      # 5. проверяем, действительно ли появился артефакт
       apex_file="$OUT/soong/apex/com.android.permissioncontroller.apex"
-      if [ -f "$apex_file" ]; then
-          echo "Success: $apex_file"
-          ls -lh "$apex_file"
+      if [[ -f "$apex_file" ]]; then
+        echo "✅  APEX собрался:"
+        ls -lh "$apex_file"
       else
-          echo "ERROR: $apex_file not found (build returned $build_result)"
-          exit $build_result
+        echo "❌  APEX НЕ создался (soong_ui вернул $build_result)"
+        exit $build_result     # делаем job красным по-настоящему
       fi
