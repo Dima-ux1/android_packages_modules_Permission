@@ -15,32 +15,24 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-          cache: gradle
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
 
       - name: System deps
         run: sudo apt-get update -qq && sudo apt-get install -y git zip unzip curl
 
-      - name: Install Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-
-      - name: Download prebuilt soong_ui
+      - name: Download official soong_ui
         run: |
-          mkdir -p ~/soong/bin
-          curl -L -o ~/soong/bin/soong_ui \
-            https://github.com/akhilnarang/soong-ui/releases/download/2024-09/soong_ui
-          chmod +x ~/soong/bin/soong_ui
-          echo "SOONG_UI=$HOME/soong/bin/soong_ui" >> $GITHUB_ENV
+          # качаем пред-собранный soong_ui из AOSP-контейнера
+          curl -L -o /tmp/soong_ui \
+            https://storage.googleapis.com/android-build/misc/soong_ui
+          chmod +x /tmp/soong_ui
+          echo "SOONG_UI=/tmp/soong_ui" >> $GITHUB_ENV
 
       - name: Clone minimal build/
         run: git clone --depth 1 https://android.googlesource.com/platform/build build
-
-      - name: Patch Android.bp for standalone build
-        run: |
-          # убираем зависимости от всего дерева
-          sed -i '/build[/][/]soong[/]/build[/][/]go[/]/blueprint/d' Android.bp || true
-          sed -i '/prebuilt[/][/]etc/d' Android.bp || true
 
       - name: Build APEX
         run: |
