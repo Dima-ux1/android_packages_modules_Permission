@@ -32,6 +32,9 @@ jobs:
       - name: Build soong_ui via bootstrap
         run: |
           cd soong
+          # удаляем go.work, чтобы go не искал external/*
+          rm -f go.work go.work.sum
+          # дальше штатный bootstrap
           go mod download
           BLUEPRINTDIR=$PWD/../blueprint \
           BOOTSTRAP=$PWD/../blueprint/bootstrap.bash \
