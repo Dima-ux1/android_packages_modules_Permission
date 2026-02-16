@@ -1,17 +1,15 @@
 name: Build crDroid PermissionController APEX
-
-# запускаем вручную или при пуше в указанные ветки
 on:
   workflow_dispatch:
   push:
-    branches: [14.0, 13.0, main]
+    branches: [ 16.0 ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 45
     steps:
-      - name: Checkout sources
+      - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -40,35 +38,27 @@ jobs:
           git clone --depth 1 https://android.googlesource.com/platform/prebuilts/build-tools build-tools
           git clone --depth 1 https://android.googlesource.com/platform/build/soong           soong
 
-      # =====  собственно сборка (без -e)  =====
-      - name: Build single APEX module
-        shell: bash          # важно: без флага -e
+      - name: Clone minimal build/ tree
         run: |
-          # 1. кладём утилиты в PATH
-          export PATH="$HOME/prebuilts/build-tools/linux-x86/bin:$PATH"
-          command -v soong_ui || { echo "soong_ui not found"; exit 1; }
+          # soong_ui требует Android.bp/Android.mk в корне
+          if [[ ! -d $GITHUB_WORKSPACE/build ]]; then
+            git clone --depth 1 https://android.googlesource.com/platform/build $GITHUB_WORKSPACE/build
+          fi
 
-          # 2. экспортируем переменные окружения AOSP
+      - name: Build single APEX module
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd $GITHUB_WORKSPACE
           export TOP=$GITHUB_WORKSPACE
           export OUT=$TOP/out
+          BUILDTOOLS="$HOME/prebuilts/build-tools"
 
-          # 3. отключаем авто-выход, чтобы внутренний exit 1 не убивал job
-          set +e
-          set -o pipefail
+          [[ -f $BUILDTOOLS/linux-x86/soong_ui ]] \
+            || { echo "❌  soong_ui not found"; exit 1; }
 
-          # 4. собираем
+          export PATH="$BUILDTOOLS/linux-x86:$PATH"
           soong_ui --make-mode com.android.permissioncontroller.apex -j$(nproc)
-          build_result=$?
-
-          # 5. проверяем, действительно ли появился артефакт
-          apex_file="$OUT/soong/apex/com.android.permissioncontroller.apex"
-          if [[ -f "$apex_file" ]]; then
-            echo "✅  APEX собрался:"
-            ls -lh "$apex_file"
-          else
-            echo "❌  APEX НЕ создался (soong_ui вернул $build_result)"
-            exit $build_result     # делаем job красным по-настоящему
-          fi
 
       - name: Upload artefact
         uses: actions/upload-artifact@v4
