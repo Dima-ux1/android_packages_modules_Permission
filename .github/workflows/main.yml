@@ -35,6 +35,7 @@ jobs:
       - name: Build soong_ui
         run: |
           cd soong/cmd/soong_ui
+          export GOWORK=off
           go build -o /tmp/soong_ui .
           chmod +x /tmp/soong_ui
           echo "SOONG_UI=/tmp/soong_ui" >> $GITHUB_ENV
