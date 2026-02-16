@@ -31,11 +31,16 @@ jobs:
 
       - name: Build single APEX module
         run: |
-          export PATH=~/prebuilts/build-tools/linux-x86/bin:$PATH
+          # кладём всё в одну папку, чтобы soong нашёлся
+          ln -s ~/prebuilts/build-tools/linux-x86/bin/* ~/prebuilts/sdk/linux-x86/bin/* ~/prebuilts/soong/ ./ 2>/dev/null || true
+          export PATH="$PWD:$PATH"
+
           export TOP=$GITHUB_WORKSPACE
           export OUT=$TOP/out
+
           # собираем ТОЛЬКО наш модуль
-          soong --make-mode com.android.permissioncontroller.apex -j$(nproc)
+          soong_ui --make-mode com.android.permissioncontroller.apex -j$(nproc)
+
           ls -lh $OUT/soong/apex/*.apex
 
       - name: Upload artefact
