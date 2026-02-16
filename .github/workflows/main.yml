@@ -23,27 +23,29 @@ jobs:
       - name: System deps
         run: sudo apt-get update -qq && sudo apt-get install -y git zip unzip curl
 
-      - name: Clone build stack + starlark-go
+      - name: Clone build stack + deps (blueprint, starlark, protobuf-go)
         run: |
           git clone --depth 1 https://android.googlesource.com/platform/build          build
           git clone --depth 1 https://android.googlesource.com/platform/build/soong      soong
           git clone --depth 1 https://android.googlesource.com/platform/build/blueprint   blueprint
           git clone --depth 1 https://android.googlesource.com/platform/external/starlark-go external/starlark-go
+          git clone --depth 1 https://github.com/protocolbuffers/protobuf-go             external/protobuf-go
 
-      - name: Patch go.mod (blueprint + starlark only)
+      - name: Patch go.mod (blueprint + starlark + protobuf)
         run: |
           cd soong
           rm -f go.work go.work.sum
           go mod edit -replace github.com/google/blueprint=../blueprint
           go mod edit -replace go.starlark.net=../external/starlark-go
+          go mod edit -replace google.golang.org/protobuf=../external/protobuf-go
           go mod tidy
           go mod download
 
       - name: Bootstrap soong_ui
         run: |
           cd soong
-          BLUEPRINTDIR=$PWD/../blueprint \
-          BOOTSTRAP=$PWD/../blueprint/bootstrap.bash \
+          export BLUEPRINTDIR=$PWD/../blueprint
+          export BOOTSTRAP=$PWD/../blueprint/bootstrap.bash
           ./bootstrap.bash
           mkdir -p out/host/linux-x86/bin
           cp out/soong_ui out/host/linux-x86/bin/soong_ui
